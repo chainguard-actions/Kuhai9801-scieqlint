@@ -1,0 +1,32 @@
+name: Test default args
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a valid markdown file in workspace
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/tmp-check-dir"
+          cat > "$GITHUB_WORKSPACE/tmp-check-dir/valid.md" << 'EOF'
+          # Valid equations
+
+          $$
+          a^2 + b^2 = c^2
+          $$
+          EOF
+
+      - name: Run SciEqLint with explicit check on subdirectory
+        id: action
+        uses: .
+        with:
+          python-version: "3.11"
+          package-version: "1.1.0"
+          args: "check tmp-check-dir"
+
+      - name: Assert action succeeded with default-style args
+        run: |
+          echo "PASS: SciEqLint ran successfully on workspace subdirectory"

@@ -1,0 +1,32 @@
+name: Test basic usage - valid equations
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a directory with a valid markdown file
+        run: |
+          mkdir -p /tmp/good-docs
+          cat > /tmp/good-docs/valid.md << 'EOF'
+          # Valid equations
+
+          $$
+          (a+b)^2 = a^2 + 2*a*b + b^2
+          $$
+          EOF
+
+      - name: Run SciEqLint on valid file
+        id: action
+        uses: .
+        with:
+          python-version: "3.11"
+          package-version: "1.1.0"
+          args: "check /tmp/good-docs"
+
+      - name: Assert action succeeded
+        run: |
+          echo "PASS: SciEqLint ran successfully on valid equations"

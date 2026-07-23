@@ -1,0 +1,134 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.11"
+      - name: Install dev environment
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[dev]'
+      - name: Ruff format
+        run: ruff format --check .
+      - name: Ruff lint
+        run: ruff check .
+      - name: Pyright
+        run: pyright
+      - name: Import boundaries
+        run: lint-imports || python -m lint_imports
+
+  test-matrix:
+    name: test (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install test environment
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[dev]'
+      - name: Pytest
+        run: pytest --cov=scieqlint --cov-report=term-missing --cov-report=xml
+      - name: Coverage gates
+        run: |
+          coverage report --fail-under=85
+          coverage report --include='src/scieqlint/check/references.py' --fail-under=95
+          coverage report --include='src/scieqlint/report/json.py' --fail-under=95
+          coverage report --include='src/scieqlint/report/github.py' --fail-under=95
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.11'
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          flags: tests
+          name: scieqlint
+          fail_ci_if_error: false
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    needs: test-matrix
+    steps:
+      - run: echo "test matrix passed"
+
+  package:
+    name: package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.11"
+      - name: Build wheel and sdist
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+          twine check dist/*
+      - name: Clean venv smoke test
+        run: |
+          python -m venv /tmp/scieqlint-smoke
+          /tmp/scieqlint-smoke/bin/python -m pip install dist/*.whl
+          /tmp/scieqlint-smoke/bin/scieqlint --help
+          /tmp/scieqlint-smoke/bin/python -m scieqlint --help
+          /tmp/scieqlint-smoke/bin/python - <<'PY'
+          from importlib import resources
+
+          preset = resources.files("scieqlint.presets").joinpath("mechanics.toml")
+          assert preset.is_file(), "mechanics preset missing from installed wheel"
+          PY
+
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.11"
+      - name: Build docs
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[docs]'
+          mkdocs build --strict
+
+  self-check:
+    name: self-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.11"
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+      - name: Run SciEqLint smoke on examples
+        run: scieqlint check "examples/good/**/*.md" --format text

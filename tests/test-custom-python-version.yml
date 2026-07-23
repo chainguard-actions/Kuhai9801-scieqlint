@@ -1,0 +1,18 @@
+name: Test custom Python version
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Run SciEqLint action with custom Python version
+        id: action
+        uses: .
+        with:
+          python-version: "3.12"
+          package-version: "1.1.0"
+          args: "--version"
+      - name: Assert action completed successfully
+        run: |
+          echo "PASS: SciEqLint action ran successfully with Python 3.12"

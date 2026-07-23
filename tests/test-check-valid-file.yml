@@ -1,0 +1,21 @@
+name: Test check command on valid files
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create a directory with no equation files to lint
+        run: |
+          mkdir -p /tmp/scieqlint-test
+          # Create a plain text file with no equations - should pass linting
+          echo "This is a plain text file with no equations." > /tmp/scieqlint-test/README.txt
+      - name: Run SciEqLint action on empty-equation directory
+        id: action
+        uses: .
+        with:
+          args: "check /tmp/scieqlint-test"
+      - name: Assert action completed successfully
+        run: |
+          echo "PASS: SciEqLint check passed on directory with no equation files"

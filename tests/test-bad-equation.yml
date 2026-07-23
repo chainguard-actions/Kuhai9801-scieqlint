@@ -1,0 +1,40 @@
+name: Test bad equation detection
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a directory with an invalid markdown file
+        run: |
+          mkdir -p /tmp/bad-docs
+          cat > /tmp/bad-docs/invalid.md << 'EOF'
+          # Famous bad equation
+
+          $$
+          (a+b)^2 = a^2 + b^2
+          $$
+          EOF
+
+      - name: Run SciEqLint on invalid file (expect failure)
+        id: action
+        uses: .
+        with:
+          python-version: "3.11"
+          package-version: "1.1.0"
+          args: "check /tmp/bad-docs"
+        continue-on-error: true
+
+      - name: Assert action failed on bad equation
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "FAIL: expected SciEqLint to fail on bad equation, but outcome was '$OUTCOME'"
+            exit 1
+          fi
+          echo "PASS: SciEqLint correctly detected bad equation and failed"

@@ -1,0 +1,32 @@
+name: Test custom args - single file check
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a valid markdown file
+        run: |
+          mkdir -p /tmp/custom-docs
+          cat > /tmp/custom-docs/math.md << 'EOF'
+          # Math document
+
+          $$
+          E = m * c^2
+          $$
+          EOF
+
+      - name: Run SciEqLint with custom args pointing to a single file
+        id: action
+        uses: .
+        with:
+          python-version: "3.11"
+          package-version: "1.1.0"
+          args: "check /tmp/custom-docs/math.md"
+
+      - name: Assert action succeeded with custom args
+        run: |
+          echo "PASS: SciEqLint ran successfully with custom file path argument"
